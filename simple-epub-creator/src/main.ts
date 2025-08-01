@@ -13,7 +13,7 @@ app.use(ElementPlus)
 
 // 註冊所有 Element Plus 的圖示
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
+    app.component(key, component)
 }
 
 app.mount('#app')
