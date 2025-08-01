@@ -52,17 +52,18 @@ const handleFileUpload = (file: any) => {
 
         // 偵測檔案編碼
         const detectedEncoding = chardet.detect(new Uint8Array(buffer))
-        // console.log('偵測到的編碼為:', detectedEncoding);
 
         const textReader = new FileReader()
         textReader.onload = (textEvent) => {
             if (textEvent.target && typeof textEvent.target.result === 'string') {
                 let text = textEvent.target.result
-
                 text = convertToTraditional(text)
+
+                const traditionalFileName = convertToTraditional(file.name)
 
                 fileContent.value = text
                 // console.log('檔案內容已讀取:', fileContent.value.substring(0, 100) + '...');
+                setDefaultBookData(traditionalFileName, text.substring(0, 200))
                 processChapters(fileContent.value)
             }
         }
@@ -77,6 +78,36 @@ const convertToTraditional = (content: string) => {
     console.log('正在將簡體中文轉換為繁體中文...')
     // 使用 converter 實例進行轉換
     return converter(content)
+}
+
+// 從文字取得預設書名與作者
+const setDefaultBookData = (fileName: string, firstParagraph: string) => {
+    const titleMatch =
+        getMatch(firstParagraph, `(書名|題名|標題|名稱|題目)[\\s:：　]*([^\\n]+)`) || // 關鍵字後文字
+        getMatch(firstParagraph, `《\\s*(.*?)\\s*》`) || // 書名號中間文字
+        getMatch(fileName, `《\\s*(.*?)\\s*》`) || // 檔名的書名號
+        getMatch(fileName, `([\\s\\S]*?)(?=作者|by)`) || // 檔名裡作者前文字當標題
+        fileName.split(`.`)[0] // 最後用檔名
+
+    const authorMatch =
+        getMatch(firstParagraph, `(作者|by)[:：\\s\\u3000\\-－]*([^\\r\\n]+)`) || // 內文作者
+        getMatch(fileName, `(作者|by)[:：\\s\\u3000\\-－]*([^\\.]+)`) // 檔名作者
+
+    // 對重要的書名和作者進行二次確認和轉換。
+    bookTitle.value = convertToTraditional(titleMatch || '')
+    author.value = convertToTraditional(authorMatch || '未知')
+
+    console.log('自動偵測到 書名:', bookTitle.value, '作者:', author.value)
+}
+
+const getMatch = (text: string, regexStr: string): string | null => {
+    const regex = new RegExp(regexStr, 'i')
+    const match = text.match(regex)
+    if (!match) return null
+    // 取得最後一組捕捉群組（避免多組括號時取錯）
+    const lastGroup = match[match.length - 1]
+    // 去除全半形空白、冒號、連字號等符號
+    return lastGroup.replace(/[:：\s\u3000\-－_]+/g, '')
 }
 
 // 章節處理函式
