@@ -34,13 +34,16 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import chardet from 'chardet'; // 引入 chardet 函式庫
+import chardet from 'chardet';
+import { Converter } from 'opencc-js';
 
 // 儲存檔案內容的變數
 const fileContent = ref<string>('');
 const chapters = ref<string[]>([]);
 const bookTitle = ref<string>('');
 const author = ref<string>('');
+
+const converter = Converter({ from: 'cn', to: 'twp' });
 
 const handleFileUpload = (file: any) => {
   if (!file.raw) return;
@@ -50,16 +53,17 @@ const handleFileUpload = (file: any) => {
     const buffer = e.target?.result as ArrayBuffer;
 
     // 偵測檔案編碼
-    // chardet.detect() 會回傳一個陣列，我們取第一個最有可能的編碼
     const detectedEncoding = chardet.detect(new Uint8Array(buffer));
+    // console.log('偵測到的編碼為:', detectedEncoding);
 
-    console.log('偵測到的編碼為:', detectedEncoding);
-
-    // 用偵測到的編碼重新讀取檔案
     const textReader = new FileReader();
     textReader.onload = (textEvent) => {
       if (textEvent.target && typeof textEvent.target.result === 'string') {
-        fileContent.value = textEvent.target.result;
+        let text = textEvent.target.result;
+
+        text = convertToTraditional(text);
+        
+        fileContent.value = text;
         // console.log('檔案內容已讀取:', fileContent.value.substring(0, 100) + '...');
         processChapters(fileContent.value);
       }
@@ -69,6 +73,12 @@ const handleFileUpload = (file: any) => {
   };
   // 讀取為 ArrayBuffer，以便 chardet 函式庫進行偵測
   reader.readAsArrayBuffer(file.raw);
+};
+
+const convertToTraditional = (content: string) => {
+  console.log('正在將簡體中文轉換為繁體中文...');
+  // 使用 converter 實例進行轉換
+  return converter(content);
 };
 
 // 章節處理函式
