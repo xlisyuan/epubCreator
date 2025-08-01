@@ -32,21 +32,27 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { v4 as uuidv4 } from 'uuid'
 import chardet from 'chardet'
 import { Converter } from 'opencc-js'
-import JSZip from 'jszip' // 引入 JSZip
+import JSZip from 'jszip'
+import { UploadFilled } from '@element-plus/icons-vue'
 
 // 儲存檔案內容的變數
 const fileContent = ref<string>('')
-const chapters = ref<string[]>([])
+// 儲存結構化章節資料（包含標題、處理後的 HTML 內容和 body 的 ID）
+const chaptersData = ref<{ title: string; contentHtml: string; bodyId: string }[]>([])
 const bookTitle = ref<string>('')
 const author = ref<string>('')
 
 /**
- * 轉換成繁體
+ * 簡繁轉換器實例
  */
 const converter = Converter({ from: 'cn', to: 'twp' })
 
+/**
+ * 處理檔案上傳
+ */
 const handleFileUpload = (file: any) => {
     if (!file.raw) return
 
@@ -61,14 +67,13 @@ const handleFileUpload = (file: any) => {
         textReader.onload = (textEvent) => {
             if (textEvent.target && typeof textEvent.target.result === 'string') {
                 let text = textEvent.target.result
-                text = convertToTraditional(text)
+                text = convertToTraditional(text) // 轉換整個檔案內容為繁體
 
-                const traditionalFileName = convertToTraditional(file.name)
+                const traditionalFileName = convertToTraditional(file.name) // 轉換檔案名稱為繁體
 
                 fileContent.value = text
-                // console.log('檔案內容已讀取:', fileContent.value.substring(0, 100) + '...');
-                setDefaultBookData(traditionalFileName, text.substring(0, 200))
-                processChapters(fileContent.value)
+                setDefaultBookData(traditionalFileName, text.substring(0, 200)) // 使用轉換後的檔名和內容
+                processChapters(fileContent.value) // 處理章節
             }
         }
         // 如果偵測失敗，預設使用 UTF-8
@@ -78,8 +83,10 @@ const handleFileUpload = (file: any) => {
     reader.readAsArrayBuffer(file.raw)
 }
 
+/**
+ * 將簡體中文轉換為繁體中文
+ */
 const convertToTraditional = (content: string) => {
-    console.log('正在將簡體中文轉換為繁體中文...')
     return converter(content)
 }
 
@@ -105,6 +112,9 @@ const setDefaultBookData = (fileName: string, firstParagraph: string) => {
     console.log('自動偵測到 書名:', bookTitle.value, '作者:', author.value)
 }
 
+/**
+ * 輔助函式：使用正規表達式取得匹配文字
+ */
 const getMatch = (text: string, regexStr: string): string | null => {
     const regex = new RegExp(regexStr, 'i')
     const match = text.match(regex)
@@ -112,28 +122,60 @@ const getMatch = (text: string, regexStr: string): string | null => {
     // 取得最後一組捕捉群組（避免多組括號時取錯）
     const lastGroup = match[match.length - 1]
     // 去除全半形空白、冒號、連字號等符號
-    return lastGroup.replace(/[:：\s\u3000\-－_]+/g, '')
+    return lastGroup.replace(/[:：\s\u3000\-－_]+/g, '').trim() // 增加 trim() 確保沒有多餘空白
 }
 
-const processChapters = (content: string) => {
-    // 簡單的章節切割邏輯：以「第一章」或「第1章」為分隔
-    const chapterRegex = /(第[零一二三四五六七八九十百千萬\d]+[章回])/g
-    const parts = content.split(chapterRegex)
+/**
+ * 章節切割與內容處理
+ * 返回包含標題、HTML 內容和 body ID 的物件陣列
+ */
+const processChapters = (text: string) => {
+    // 使用正規表達式尋找章節標題
+    const chapterRegex =
+        /(^第[零一二三四五六七八九十百千萬\d]+章.*|^[一二三四五六七八九十百千萬\d]+、.*|^[0-9]+\..*)/gm
+    const matchedParts = text.split(chapterRegex)
 
-    // 重新組合章節標題和內容
-    const combinedChapters: string[] = []
-    for (let i = 1; i < parts.length; i += 2) {
-        if (parts[i + 1]) {
-            combinedChapters.push(parts[i] + parts[i + 1].trim())
+    const tempChaptersData: { title: string; contentHtml: string; bodyId: string }[] = []
+    if (matchedParts.length > 1) {
+        // 第一個元素通常是序言或空白，先忽略
+        for (let i = 1; i < matchedParts.length; i += 2) {
+            const chapterTitleRaw = matchedParts[i].trim() // 乾淨的章節標題
+            const chapterContentRaw = matchedParts[i + 1] ? matchedParts[i + 1].trim() : '' // 章節內容
+            const chapterFileIndex = (i - 1) / 2 + 1 // 計算章節檔案的 1-based 索引
+            const bodyId = `body_chapter${chapterFileIndex}` // 為 body 標籤生成 ID
+
+            // 為 <h1> 標籤添加一個唯一的 id
+            const contentHtml = `<h1 id="chapter${chapterFileIndex}_start">${chapterTitleRaw}</h1>\n${chapterContentRaw
+                .split('\n')
+                .map((line) => `<p>${line.trim()}</p>`)
+                .join('\n')}`
+
+            tempChaptersData.push({
+                title: chapterTitleRaw, // 儲存乾淨的標題用於目錄
+                contentHtml: contentHtml, // 儲存完整的 HTML 內容用於章節檔案
+                bodyId: bodyId, // 儲存 body 的 ID
+            })
         }
+    } else {
+        // 如果沒有章節標題，將整個檔案視為單一章節
+        const bodyId = `body_main`
+        tempChaptersData.push({
+            title: bookTitle.value || '正文', // 使用書名或預設標題
+            contentHtml: `<p>${text.replace(/\n\s*\n/g, '</p>\n<p>')}</p>`,
+            bodyId: bodyId,
+        })
     }
-    chapters.value = combinedChapters
-    console.log('切割後的章節數:', chapters.value.length)
+
+    chaptersData.value = tempChaptersData // 更新 chaptersData
+    console.log('切割後的章節數:', chaptersData.value.length)
 }
 
+/**
+ * 生成 EPUB 檔案
+ */
 const generateEpub = async () => {
-    if (!bookTitle.value || !author.value || chapters.value.length === 0) {
-        alert('請填寫書名和作者，並上傳檔案。')
+    if (!bookTitle.value || !author.value || chaptersData.value.length === 0) {
+        console.error('請填寫書名和作者，並上傳檔案。') // 改用 console.error
         return
     }
 
@@ -145,7 +187,7 @@ const generateEpub = async () => {
     // 2. META-INF/container.xml (EPUB 必需)
     const metaInf = zip.folder('META-INF')
     if (!metaInf) {
-        alert('無法建立 META-INF 資料夾。')
+        console.error('無法建立 META-INF 資料夾。') // 改用 console.error
         return
     }
     metaInf.file(
@@ -161,7 +203,7 @@ const generateEpub = async () => {
     // 3. OEBPS 目錄
     const OEBPS = zip.folder('OEBPS')
     if (!OEBPS) {
-        alert('無法建立 OEBPS 資料夾。')
+        console.error('無法建立 OEBPS 資料夾。') // 改用 console.error
         return
     }
 
@@ -176,24 +218,20 @@ const generateEpub = async () => {
     // 5. 產生每個章節的 XHTML 檔案
     const manifestItems: string[] = []
     const spineItems: string[] = []
-    chapters.value.forEach((chapterContent, index) => {
+    chaptersData.value.forEach((chapter, index) => {
         const chapterId = `chapter-${index + 1}`
-        const chapterTitle = `第${index + 1}章`
         const chapterFilename = `${chapterId}.xhtml`
 
+        // 為 <body> 標籤添加 ID
         const xhtmlContent = `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="zh-TW">
 <head>
-    <title>${chapterTitle}</title>
+    <title>${chapter.title}</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" type="text/css" href="style.css" />
 </head>
-<body>
-    <h1>${chapterTitle}</h1>
-    ${chapterContent
-        .split('\n')
-        .map((line) => `<p>${line.trim()}</p>`)
-        .join('\n')}
+<body id="${chapter.bodyId}"> <!-- 添加 body ID -->
+    ${chapter.contentHtml}
 </body>
 </html>`
 
@@ -205,33 +243,84 @@ const generateEpub = async () => {
     })
 
     // 6. content.opf (書籍資訊與檔案清單)
-    const opfContent = `<?xml version="1.0" encoding="utf-8"?>
-<package version="3.0" unique-identifier="pub-id" xmlns="http://www.idpf.org/2007/opf">
+    // 新增 nav.xhtml 的 manifest item
+    const manifestWithNav = `${manifestItems}\n<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>`
+
+    const contentOpf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="pub-id" version="3.0">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="pub-id">urn:uuid:${uuidv4()}</dc:identifier>
     <dc:title>${bookTitle.value}</dc:title>
     <dc:creator>${author.value}</dc:creator>
     <dc:language>zh-TW</dc:language>
   </metadata>
   <manifest>
+    ${manifestWithNav}
     <item id="style" href="style.css" media-type="text/css"/>
-    ${manifestItems.join('\n    ')}
   </manifest>
   <spine>
+    <itemref idref="nav" /> <!-- 將 nav 放在 spine 的最前面 -->
     ${spineItems.join('\n    ')}
   </spine>
 </package>`
-    OEBPS.file('content.opf', opfContent)
 
-    // 7. 打包成 EPUB
-    zip.generateAsync({ type: 'blob' }).then((content) => {
+    if (OEBPS) {
+        OEBPS.file('content.opf', contentOpf)
+    }
+
+    // 7. 生成 nav.xhtml 檔案
+    const navContent = generateNavFile(chaptersData.value) // 傳遞結構化的章節資料
+    if (OEBPS) {
+        OEBPS.file('nav.xhtml', navContent)
+    }
+
+    // 8. 打包成 EPUB
+    zip.generateAsync({
+        type: 'blob',
+        compression: 'DEFLATE', // 這是預設的壓縮方式
+        compressionOptions: {
+            level: 9, // 最高壓縮率
+        },
+    }).then((content) => {
         const a = document.createElement('a')
         document.body.appendChild(a)
         a.href = URL.createObjectURL(content)
         a.download = `${bookTitle.value}.epub`
         a.click()
         document.body.removeChild(a)
-        alert('EPUB 生成成功，開始下載！')
+        console.log('EPUB 生成成功，開始下載！') // 改用 console.log
     })
+}
+
+/**
+ * 生成 nav.xhtml 目錄檔案
+ */
+const generateNavFile = (chapters: { title: string; contentHtml: string; bodyId: string }[]) => {
+    const chapterLinks = chapters
+        .map((chapter, index) => {
+            const chapterTitleForNav = chapter.title || `第 ${index + 1} 章`
+            // 連結到 body 的 ID
+            return `<li id="toc-chapter${index + 1}"><a href="chapter${index + 1}.xhtml#${chapter.bodyId}">${chapterTitleForNav}</a></li>`
+        })
+        .join('\n')
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh-TW" lang="zh-TW">
+  <head>
+    <title>${bookTitle.value} - 目錄</title>
+	<meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <nav epub:type="toc" id="toc">
+      <h1>目錄</h1>
+      <ol>
+        ${chapterLinks}
+      </ol>
+    </nav>
+  </body>
+</html>`
 }
 </script>
 
