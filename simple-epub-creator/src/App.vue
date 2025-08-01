@@ -34,7 +34,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-// import { UploadFilled } from '@element-plus/icons-vue'; //已經被全域引入
+import chardet from 'chardet'; // 引入 chardet 函式庫
 
 // 儲存檔案內容的變數
 const fileContent = ref<string>('');
@@ -47,16 +47,31 @@ const handleFileUpload = (file: any) => {
 
   const reader = new FileReader();
   reader.onload = (e) => {
-    if (e.target && typeof e.target.result === 'string') {
-      fileContent.value = e.target.result;
-      // 呼叫章節處理函式
-      processChapters(fileContent.value);
-    }
+    const buffer = e.target?.result as ArrayBuffer;
+
+    // 偵測檔案編碼
+    // chardet.detect() 會回傳一個陣列，我們取第一個最有可能的編碼
+    const detectedEncoding = chardet.detect(new Uint8Array(buffer));
+
+    console.log('偵測到的編碼為:', detectedEncoding);
+
+    // 用偵測到的編碼重新讀取檔案
+    const textReader = new FileReader();
+    textReader.onload = (textEvent) => {
+      if (textEvent.target && typeof textEvent.target.result === 'string') {
+        fileContent.value = textEvent.target.result;
+        // console.log('檔案內容已讀取:', fileContent.value.substring(0, 100) + '...');
+        processChapters(fileContent.value);
+      }
+    };
+    // 如果偵測失敗，預設使用 UTF-8
+    textReader.readAsText(file.raw, detectedEncoding || 'UTF-8');
   };
-  reader.readAsText(file.raw, 'UTF-8');
+  // 讀取為 ArrayBuffer，以便 chardet 函式庫進行偵測
+  reader.readAsArrayBuffer(file.raw);
 };
 
-// 新增的章節處理函式
+// 章節處理函式
 const processChapters = (content: string) => {
   // 簡單的章節切割邏輯：以「第一章」或「第1章」為分隔
   const chapterRegex = /(第[零一二三四五六七八九十百千萬\d]+[章回])/g;
