@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
+    "chardet": "^2.1.0",
     "element-plus": "^2.10.4",
     "jszip": "^3.10.1",
     "vue": "^3.5.18"
