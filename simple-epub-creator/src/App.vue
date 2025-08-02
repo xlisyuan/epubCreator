@@ -1,6 +1,6 @@
 <template>
     <div class="epub-creator">
-        <h1>我的線上 EPUB 編輯器</h1>
+        <h1>線上 EPUB 編輯器</h1>
         <p>上傳你的 .txt 檔案，快速製作電子書！</p>
         <el-upload
             class="upload-area"
@@ -23,9 +23,14 @@
                     <el-input v-model="author"></el-input>
                 </el-form-item>
             </el-form>
-            <el-button type="primary" @click="generateEpub" :disabled="!bookTitle || !author">
-                生成 EPUB
-            </el-button>
+            <div class="button-group">
+                <el-button type="primary" @click="generateEpub" :disabled="!bookTitle || !author">
+                    生成 EPUB
+                </el-button>
+                <el-button type="info" @click="downloadTxt" :disabled="!bookTitle || !author">
+                    下載 繁體TXT
+                </el-button>
+            </div>
         </el-card>
     </div>
 </template>
@@ -183,6 +188,25 @@ const processChapters = (text: string) => {
 
     chaptersData.value = tempChaptersData // 更新 chaptersData
     console.log('切割後的章節數:', chaptersData.value.length)
+}
+
+/**
+ * 下載繁體 TXT 檔案
+ */
+const downloadTxt = () => {
+    if (!fileContent.value || !bookTitle.value || !author.value) {
+        console.error('沒有可下載的內容或書名和作者。')
+        return
+    }
+
+    const blob = new Blob([fileContent.value], { type: 'text/plain;charset=utf-8' })
+    const a = document.createElement('a')
+    document.body.appendChild(a)
+    a.href = URL.createObjectURL(blob)
+    a.download = `《 ${bookTitle.value}》作者：${author.value}.txt` // 檔案名稱
+    a.click()
+    document.body.removeChild(a)
+    console.log('繁體 TXT 檔案下載成功！')
 }
 
 /**
@@ -356,8 +380,16 @@ const generateNavFile = (
     margin-top: 30px;
     text-align: left;
 }
-.el-button {
-    width: 100%;
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
     margin-top: 20px;
+}
+
+.button-group .el-button {
+    width: 100%;
+    margin-left: 0 !important;
 }
 </style>
