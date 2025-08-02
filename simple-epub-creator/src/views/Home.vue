@@ -32,7 +32,7 @@ const goToTxtToEpub = () => {
 .home-buttons {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 15px; /* 按鈕之間的垂直間距 */
     margin-top: 30px;
 }
 .home-buttons .el-button {

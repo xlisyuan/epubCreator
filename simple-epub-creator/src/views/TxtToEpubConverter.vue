@@ -390,6 +390,5 @@ const generateNavFile = (
 
 .button-group .el-button {
     width: 100%;
-    margin-left: 0 !important;
 }
 </style>

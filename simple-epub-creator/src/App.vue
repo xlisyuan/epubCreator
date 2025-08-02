@@ -20,4 +20,10 @@ body {
 #app {
     /* 可以放一些應用程式級別的樣式，例如最大寬度或置中 */
 }
+
+/* 全域覆蓋 Element Plus 按鈕的預設 margin-left */
+/* 這會影響所有 el-button，除非有更具體的規則覆蓋它 */
+.el-button + .el-button {
+    margin-left: 0 !important; /* 強制移除預設的水平間距 */
+}
 </style>
