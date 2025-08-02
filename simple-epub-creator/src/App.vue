@@ -149,7 +149,7 @@ const processChapters = (text: string) => {
             const chapterTitleRaw = matchedParts[i].trim() // 乾淨的章節標題
             const chapterContentRaw = matchedParts[i + 1] ? matchedParts[i + 1].trim() : '' // 章節內容
             const chapterFileIndex = (i - 1) / 2 + 1 // 計算章節檔案的 1-based 索引
-            const chapterId = `chap-${chapterFileIndex}` // ✨ 修正：統一章節 ID 格式 ✨
+            const chapterId = `chap-${chapterFileIndex}` // 統一章節 ID 格式
             const bodyId = `body_${chapterId}` // 為 body 標籤生成 ID
 
             // 優化：將內容分割成段落，並只包覆非空白段落
@@ -163,12 +163,12 @@ const processChapters = (text: string) => {
                 title: chapterTitleRaw, // 儲存乾淨的標題用於目錄
                 contentHtml: contentHtml, // 儲存完整的 HTML 內容用於章節檔案
                 bodyId: bodyId, // 儲存 body 的 ID
-                chapterId: chapterId, // ✨ 儲存統一的章節 ID ✨
+                chapterId: chapterId, // 儲存統一的章節 ID
             })
         }
     } else {
         // 如果沒有章節標題，將整個檔案視為單一章節
-        const chapterId = `main-chap` // ✨ 修正：統一單一章節 ID 格式 ✨
+        const chapterId = `main-chap` // 統一單一章節 ID 格式
         const bodyId = `body_${chapterId}`
         const paragraphs = text.split(/\n{2,}/).filter((p) => p.trim() !== '')
         const paragraphHtml = paragraphs.map((p) => `<p>${p.trim()}</p>`).join('\n')
@@ -177,7 +177,7 @@ const processChapters = (text: string) => {
             title: bookTitle.value || '正文', // 使用書名或預設標題
             contentHtml: paragraphHtml, // 如果沒有章節標題，直接是段落內容
             bodyId: bodyId,
-            chapterId: chapterId, // ✨ 儲存統一的章節 ID ✨
+            chapterId: chapterId,
         })
     }
 
@@ -234,8 +234,7 @@ const generateEpub = async () => {
     const manifestItems: string[] = []
     const spineItems: string[] = []
     chaptersData.value.forEach((chapter) => {
-        // 不再需要 index，直接用 chapter.chapterId
-        const chapterFilename = `${chapter.chapterId}.xhtml` // ✨ 修正：使用 chapter.chapterId ✨
+        const chapterFilename = `${chapter.chapterId}.xhtml`
 
         const xhtmlContent = `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="zh-TW">
@@ -251,9 +250,9 @@ const generateEpub = async () => {
 
         OEBPS.file(chapterFilename, xhtmlContent)
         manifestItems.push(
-            `<item id="${chapter.chapterId}" href="${chapterFilename}" media-type="application/xhtml+xml"/>`, // ✨ 修正：使用 chapter.chapterId ✨
+            `<item id="${chapter.chapterId}" href="${chapterFilename}" media-type="application/xhtml+xml"/>`,
         )
-        spineItems.push(`<itemref idref="${chapter.chapterId}"/>`) // ✨ 修正：使用 chapter.chapterId ✨
+        spineItems.push(`<itemref idref="${chapter.chapterId}"/>`)
     })
 
     // 6. content.opf (書籍資訊與檔案清單)
@@ -316,7 +315,6 @@ const generateNavFile = (
         .map((chapter) => {
             // 不再需要 index
             const chapterTitleForNav = chapter.title || '無標題章節' // 提供預設值
-            // ✨ 修正：使用 chapter.chapterId 作為 href 的一部分 ✨
             return `<li id="toc-${chapter.chapterId}"><a href="${chapter.chapterId}.xhtml#${chapter.bodyId}">${chapterTitleForNav}</a></li>`
         })
         .join('\n')
