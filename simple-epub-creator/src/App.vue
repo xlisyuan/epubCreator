@@ -23,6 +23,7 @@ body {
 
 /* 全域覆蓋 Element Plus 按鈕的預設 margin-left */
 /* 這會影響所有 el-button，除非有更具體的規則覆蓋它 */
+/* 不想用 important 可以把所有的 el-button 用 el-space 組件處理 */
 .el-button + .el-button {
     margin-left: 0 !important; /* 強制移除預設的水平間距 */
 }
