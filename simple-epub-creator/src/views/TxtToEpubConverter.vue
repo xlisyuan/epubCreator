@@ -45,7 +45,7 @@ import { UploadFilled } from '@element-plus/icons-vue'
 
 // 儲存檔案內容的變數
 const fileContent = ref<string>('')
-// 儲存結構化章節資料（包含標題、處理後的 HTML 內容、body 的 ID 和章節 ID）
+// 儲存結構化章節資料（包含標題、處理後的 HTML 內容和 body 的 ID）
 const chaptersData = ref<
     { title: string; contentHtml: string; bodyId: string; chapterId: string }[]
 >([])
@@ -157,9 +157,22 @@ const processChapters = (text: string) => {
             const chapterId = `chap-${chapterFileIndex}` // 統一章節 ID 格式
             const bodyId = `body_${chapterId}` // 為 body 標籤生成 ID
 
-            // 優化：將內容分割成段落，並只包覆非空白段落
-            const paragraphs = chapterContentRaw.split(/\n{2,}/).filter((p) => p.trim() !== '') // 以兩個或更多換行符分割段落，並過濾空段落
-            const paragraphHtml = paragraphs.map((p) => `<p>${p.trim()}</p>`).join('\n')
+            // 精確處理換行符
+            // 1. 以兩個或更多換行符分割成邏輯段落
+            const logicalParagraphs = chapterContentRaw.split(/\n{2,}/)
+            // 2. 對每個邏輯段落，將單一換行符替換為 <br/>，並包裝在 <p> 標籤中
+            const paragraphHtml = logicalParagraphs
+                .map((p) => {
+                    const trimmedP = p.trim()
+                    if (trimmedP === '') {
+                        return '' // 過濾掉完全空白的段落
+                    }
+                    // 將段落內部的單一換行符替換為 <br/>
+                    const contentWithLineBreaks = trimmedP.replace(/\n/g, '<br/>')
+                    return `<p>${contentWithLineBreaks}</p>`
+                })
+                .filter((html) => html !== '')
+                .join('\n') // 過濾掉 map 後可能產生的空 HTML 字串
 
             // 為 <h1> 標籤添加一個唯一的 id
             const contentHtml = `<h1 id="${chapterId}_start">${chapterTitleRaw}</h1>\n${paragraphHtml}`
@@ -175,8 +188,20 @@ const processChapters = (text: string) => {
         // 如果沒有章節標題，將整個檔案視為單一章節
         const chapterId = `main-chap` // 統一單一章節 ID 格式
         const bodyId = `body_${chapterId}`
-        const paragraphs = text.split(/\n{2,}/).filter((p) => p.trim() !== '')
-        const paragraphHtml = paragraphs.map((p) => `<p>${p.trim()}</p>`).join('\n')
+
+        // 單一章節也使用相同的換行處理邏輯
+        const logicalParagraphs = text.split(/\n{2,}/)
+        const paragraphHtml = logicalParagraphs
+            .map((p) => {
+                const trimmedP = p.trim()
+                if (trimmedP === '') {
+                    return ''
+                }
+                const contentWithLineBreaks = trimmedP.replace(/\n/g, '<br/>')
+                return `<p>${contentWithLineBreaks}</p>`
+            })
+            .filter((html) => html !== '')
+            .join('\n')
 
         tempChaptersData.push({
             title: bookTitle.value || '正文', // 使用書名或預設標題
