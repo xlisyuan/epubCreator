@@ -47,7 +47,7 @@ const routes = [
 ]
 
 const router = createRouter({
-    history: createWebHistory(BASE_URL), // ✨ 將 BASE_URL 傳遞給 createWebHistory ✨
+    history: createWebHistory(BASE_URL), // 將 BASE_URL 傳遞給 createWebHistory
     routes,
 })
 
