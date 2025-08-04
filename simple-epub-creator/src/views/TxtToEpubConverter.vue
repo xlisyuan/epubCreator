@@ -79,7 +79,7 @@ const handleFileUpload = (file: any) => {
                 const traditionalFileName = convertToTraditional(file.name) // 轉換檔案名稱為繁體
 
                 fileContent.value = text
-                setDefaultBookData(traditionalFileName, text.substring(0, 200)) // 使用轉換後的檔名和內容
+                setDefaultBookData(traditionalFileName, text.substring(0, 500)) // 使用轉換後的檔名和內容
                 processChapters(fileContent.value) // 處理章節
             }
         }
@@ -108,9 +108,18 @@ const setDefaultBookData = (fileName: string, firstParagraph: string) => {
         getMatch(fileName, `([\\s\\S]*?)(?=作者|by)`) || // 檔名裡作者前文字當標題
         fileName.split(`.`)[0] // 最後用檔名
 
-    const authorMatch =
-        getMatch(firstParagraph, `(作者|by)[:：\\s\\u3000\\-－]*([^\\r\\n]+)`) || // 內文作者
-        getMatch(fileName, `(作者|by)[:：\\s\\u3000\\-－]*([^\\.]+)`) // 檔名作者
+    const authorRaw =
+        getMatch(firstParagraph, `(作者|by|Author)([:：\\s\\u3000\\-－_]+)([^\\r\\n]+)`, false) ||
+        getMatch(fileName, `(作者|by|Author)[:：\\s\\u3000\\-－]*([^\\.]+)`, false) ||
+        getMatch(firstParagraph, `(作者|by|Author)[:：\\s\\u3000\\-－]*([^\\r\\n]+)`, false)
+
+    let authorMatch: string | null = null
+
+    if (authorRaw) {
+        authorMatch = /[\u4e00-\u9fff]/.test(authorRaw)
+            ? getMatch(authorRaw, '^([^\\s\\u3000]+)') // 中文名：抓第一段（遇空白或全形空白就截斷）
+            : authorRaw // 英文名：保留空白，已 trim 過
+    }
 
     // 對重要的書名和作者進行二次確認和轉換。
     bookTitle.value = convertToTraditional(titleMatch || '未知')
@@ -122,14 +131,20 @@ const setDefaultBookData = (fileName: string, firstParagraph: string) => {
 /**
  * 輔助函式：使用正規表達式取得匹配文字
  */
-const getMatch = (text: string, regexStr: string): string | null => {
+const getMatch = (text: string, regexStr: string, clean: boolean = true): string | null => {
     const regex = new RegExp(regexStr, 'i')
     const match = text.match(regex)
     if (!match) return null
     // 取得最後一組捕捉群組（避免多組括號時取錯）
     const lastGroup = match[match.length - 1]
-    // 去除全半形空白、冒號、連字號等符號
-    return lastGroup.replace(/[:：\s\u3000\-－_]+/g, '').trim() // 增加 trim() 確保沒有多餘空白
+
+    if (clean) {
+        // 去除全半形空白、冒號、連字號等符號
+        return lastGroup.replace(/[:：\s\u3000\-－_]+/g, '').trim()
+    } else {
+        // 英文名稱不去除空白、連字號
+        return lastGroup.replace(/[:：]+/g, '').trim()
+    }
 }
 
 /**
@@ -139,7 +154,7 @@ const getMatch = (text: string, regexStr: string): string | null => {
 const processChapters = (text: string) => {
     // 使用正規表達式尋找章節標題
     const chapterRegex =
-        /(^第[零一二三四五六七八九十百千萬\d]+章.*|^[一二三四五六七八九十百千萬\d]+、.*|^[0-9]+\..*)/gm
+        /(^第[零一二三四五六七八九十百千萬\d０-９]{1,5}章.*|^[一二三四五六七八九十百千萬\d]+、.*|^[0-9]+\..*)/gm
     const matchedParts = text.split(chapterRegex)
 
     const tempChaptersData: {
