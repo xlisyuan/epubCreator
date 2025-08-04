@@ -154,8 +154,9 @@ const getMatch = (text: string, regexStr: string, clean: boolean = true): string
 const processChapters = (text: string) => {
     // 使用正規表達式尋找章節標題
     const chapterRegex =
-        /(^第[零一二三四五六七八九十百千萬\d０-９]{1,5}章.*|^[一二三四五六七八九十百千萬\d]+、.*|^[0-9]+\..*)/gm
-    const matchedParts = text.split(chapterRegex)
+        /^[\s\u3000]*第[零一二三四五六七八九十百千萬\d０-９]{1,5}章.*|^[一二三四五六七八九十百千萬\d]+、.*|^[0-9]+\..*/gm
+    const matchedTitles = text.match(chapterRegex) || []
+    const matchedParts = text.split(chapterRegex).slice(1) // 保留名稱 matchedParts 當內容段落陣列
 
     const tempChaptersData: {
         title: string
@@ -166,8 +167,8 @@ const processChapters = (text: string) => {
     if (matchedParts.length > 1) {
         // 第一個元素通常是序言或空白，先忽略
         for (let i = 1; i < matchedParts.length; i += 2) {
-            const chapterTitleRaw = matchedParts[i].trim() // 乾淨的章節標題
-            const chapterContentRaw = matchedParts[i + 1] ? matchedParts[i + 1].trim() : '' // 章節內容
+            const chapterTitleRaw = matchedTitles[(i - 1) / 2]?.trim() || '' // 乾淨的章節標題
+            const chapterContentRaw = matchedParts[i].trim() // 章節內容
             const chapterFileIndex = (i - 1) / 2 + 1 // 計算章節檔案的 1-based 索引
             const chapterId = `chap-${chapterFileIndex}` // 統一章節 ID 格式
             const bodyId = `body_${chapterId}` // 為 body 標籤生成 ID
